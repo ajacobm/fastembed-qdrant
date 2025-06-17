@@ -1,0 +1,50 @@
+# FastEmbed cache directory - contains large model files
+cache/*
+
+# Keep the README but ignore actual cache content
+!cache/README.md
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.docker
+.env.*
+
+# UV
+.venv/
+uv.lock
+
+# Test files
+test_*.py
+validate_*.py
+comprehensive_test.py
+*_test.py
+
+# Development logs
+*.log
+*_logs.txt
+
+# Docker
+.dockerignore

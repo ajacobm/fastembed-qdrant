@@ -1,0 +1,1 @@
+"""FastEmbed service package."""
