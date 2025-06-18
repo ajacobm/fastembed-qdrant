@@ -24,6 +24,9 @@ dependencies = [
     "aiofiles>=23.2.0",
     "pyzmq>=25.0.0",
     "python-dotenv>=1.0.0",
+    # Observability dependencies
+    "structlog>=23.2.0",
+    "python-json-logger>=2.0.0",
 ]
 
 [project.optional-dependencies]

@@ -9,10 +9,12 @@ import logging
 import time
 from typing import List, Dict, Any, Optional, Union
 from contextlib import asynccontextmanager
+import uuid
 
 import grpc
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Request
 from fastapi.responses import JSONResponse
+from fastapi import status
 from pydantic import BaseModel
 
 # Import protobuf classes
@@ -24,8 +26,10 @@ from proto.embed_pb2 import (
 from proto.embed_pb2_grpc import EmbeddingServiceStub
 
 from config import load_config
+from observability.logger import get_logger, RequestContext, log_operation_context
+from observability.log_context import get_current_request_id
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # Pydantic models for API
@@ -102,35 +106,66 @@ class HTTPEmbeddingService:
     
     async def connect(self):
         """Connect to the gRPC server."""
-        self.channel = grpc.aio.insecure_channel(f'{self.grpc_host}:{self.grpc_port}')
-        self.stub = EmbeddingServiceStub(self.channel)
-        logger.info(f"Connected to gRPC server at {self.grpc_host}:{self.grpc_port}")
+        with log_operation_context("grpc_connect", {"host": self.grpc_host, "port": self.grpc_port}):
+            self.channel = grpc.aio.insecure_channel(f'{self.grpc_host}:{self.grpc_port}')
+            self.stub = EmbeddingServiceStub(self.channel)
+            logger.info(f"Connected to gRPC server at {self.grpc_host}:{self.grpc_port}")
     
     async def disconnect(self):
         """Disconnect from the gRPC server."""
         if self.channel:
-            await self.channel.close()
+            with log_operation_context("grpc_disconnect", {"host": self.grpc_host, "port": self.grpc_port}):
+                await self.channel.close()
     
     async def get_embeddings(self, texts: List[str], model_name: Optional[str] = None) -> Dict[str, Any]:
         """Get embeddings for a list of texts."""
-        request = GrpcEmbeddingRequest(texts=texts, model_name=model_name or "")
+        operation_data = {
+            "text_count": len(texts), 
+            "model_name": model_name or "current",
+            "total_chars": sum(len(text) for text in texts)
+        }
         
-        try:
-            response = await self.stub.GetEmbeddings(request)
-            embeddings = []
-            for emb in response.embeddings:
-                embeddings.append({
-                    "vector": list(emb.vector),
-                    "dimension": emb.dimension
-                })
+        with log_operation_context("grpc_get_embeddings", operation_data):
+            request = GrpcEmbeddingRequest(texts=texts, model_name=model_name or "")
             
-            return {
-                "embeddings": embeddings,
-                "model_name": model_name or "current"
-            }
-        except grpc.RpcError as e:
-            logger.error(f"gRPC error getting embeddings: {e}")
-            raise HTTPException(status_code=500, detail=f"gRPC error: {e.details()}")
+            operation_data = {
+            "filename": filename,
+            "content_type": content_type,
+            "file_size": len(file_content),
+            "model_name": options.model_name or "current",
+            "chunk_size": options.chunk_size,
+            "store_in_qdrant": options.store_in_qdrant,
+            "collection_name": options.collection_name
+        }
+        
+        with log_operation_context("grpc_process_file_stream", operation_data):
+            try:
+                response = await self.stub.GetEmbeddings(request)
+                embeddings = []
+                for emb in response.embeddings:
+                    embeddings.append({
+                        "vector": list(emb.vector),
+                        "dimension": emb.dimension
+                    })
+                
+                result = {
+                    "embeddings": embeddings,
+                    "model_name": model_name or "current"
+                }
+                
+                logger.info("Successfully generated embeddings", extra={
+                    "embeddings_count": len(embeddings),
+                    "model_name": result["model_name"]
+                })
+                
+                return result
+                
+            except grpc.RpcError as e:
+                logger.error(f"gRPC error getting embeddings: {e}", extra={
+                    "grpc_code": e.code().name if e.code() else "UNKNOWN",
+                    "grpc_details": e.details()
+                })
+                raise HTTPException(status_code=500, detail=f"gRPC error: {e.details()}")
     
     async def process_file_stream(
         self,

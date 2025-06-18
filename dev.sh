@@ -29,8 +29,12 @@ print_usage() {
     echo "  protobuf        - Regenerate protobuf files"
     echo "  test-grpc       - Run gRPC client example"
     echo "  test-http       - Test HTTP endpoints"
+    echo "  test-observability - Test observability features"
+    echo "  demo-observability - Run observability demo"
     echo "  run-grpc        - Run gRPC server locally"
     echo "  run-http        - Run HTTP server locally"
+    echo "  run-http-obs    - Run HTTP server with observability"
+    echo "  run-enhanced    - Run enhanced server with observability"
     echo "  docker-build    - Build Docker image"
     echo "  docker-up       - Start services with Docker Compose"
     echo "  docker-down     - Stop Docker Compose services"
@@ -97,6 +101,55 @@ run_grpc_server() {
     uv run python src/enhanced_server.py
 }
 
+run_http_server_observability() {
+    echo -e "${GREEN}Starting FastEmbed HTTP server with observability...${NC}"
+    export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
+    export PATH="${HOME}/.local/bin:$PATH"
+    
+    # Set default environment variables for observability
+    export HTTP_PORT=8000
+    export GRPC_PORT=50051
+    export LOG_LEVEL=${LOG_LEVEL:-"INFO"}
+    export LOG_FORMAT=${LOG_FORMAT:-"json"}
+    export LOG_OUTPUT=${LOG_OUTPUT:-"console"}
+    
+    echo -e "${YELLOW}HTTP Server with Observability configuration:${NC}"
+    echo "  HTTP Port: $HTTP_PORT"
+    echo "  gRPC Port: $GRPC_PORT"
+    echo "  API Docs: http://localhost:$HTTP_PORT/docs"
+    echo "  Log Level: $LOG_LEVEL"
+    echo "  Log Format: $LOG_FORMAT"
+    echo "  Log Output: $LOG_OUTPUT"
+    echo ""
+    
+    uv run python src/http_server_with_observability.py
+}
+
+run_enhanced_server() {
+    echo -e "${GREEN}Starting FastEmbed Enhanced Server with Observability...${NC}"
+    export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
+    export PATH="${HOME}/.local/bin:$PATH"
+    
+    # Set default environment variables for observability
+    export GRPC_PORT=50051
+    export DEFAULT_MODEL="BAAI/bge-base-en-v1.5"
+    export USE_CUDA=true
+    export LOG_LEVEL=${LOG_LEVEL:-"INFO"}
+    export LOG_FORMAT=${LOG_FORMAT:-"json"}
+    export LOG_OUTPUT=${LOG_OUTPUT:-"console"}
+    
+    echo -e "${YELLOW}Enhanced Server configuration:${NC}"
+    echo "  gRPC Port: $GRPC_PORT"
+    echo "  Default Model: $DEFAULT_MODEL"
+    echo "  Use CUDA: $USE_CUDA"
+    echo "  Log Level: $LOG_LEVEL"
+    echo "  Log Format: $LOG_FORMAT"
+    echo "  Log Output: $LOG_OUTPUT"
+    echo ""
+    
+    uv run python src/enhanced_server_with_observability.py
+}
+
 run_http_server() {
     echo -e "${GREEN}Starting FastEmbed HTTP server...${NC}"
     export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
@@ -151,6 +204,51 @@ test_http() {
     echo ""
     
     echo -e "${GREEN}HTTP tests completed${NC}"
+}
+
+test_observability() {
+    echo -e "${GREEN}Testing observability features...${NC}"
+    export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
+    export PATH="${HOME}/.local/bin:$PATH"
+    
+    echo -e "${YELLOW}Running basic observability tests...${NC}"
+    
+    uv run python -c "
+import sys
+from pathlib import Path
+
+# Add src to path
+src_path = Path('.') / 'src'
+sys.path.insert(0, str(src_path))
+
+from observability import setup_logging, get_logger, RequestContext, LogConfig
+import time
+
+print('🧪 Testing observability system...')
+
+# Test JSON logging
+setup_logging(level='INFO', format_type='json', output_type='console')
+logger = get_logger('test')
+logger.info('Observability test started', component='dev_script')
+
+# Test request context
+with RequestContext('test-123', method='TestMethod', model='test-model') as ctx:
+    logger.info('Request processing test', operation='basic_test')
+    time.sleep(0.1)
+
+logger.info('Observability test completed successfully')
+print('✅ Observability system working correctly!')
+"
+    
+    echo -e "${GREEN}Observability tests completed${NC}"
+}
+
+demo_observability() {
+    echo -e "${GREEN}Running observability demo...${NC}"
+    export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
+    export PATH="${HOME}/.local/bin:$PATH"
+    
+    uv run python demo_observability_phase1.py
 }
 
 docker_build() {
@@ -239,11 +337,23 @@ case "${1:-help}" in
     test-http)
         test_http
         ;;
+    test-observability)
+        test_observability
+        ;;
+    demo-observability)
+        demo_observability
+        ;;
     run-grpc)
         run_grpc_server
         ;;
     run-http)
         run_http_server
+        ;;
+    run-http-obs)
+        run_http_server_observability
+        ;;
+    run-enhanced)
+        run_enhanced_server
         ;;
     docker-build)
         docker_build
