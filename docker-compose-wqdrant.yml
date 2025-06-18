@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # Qdrant vector database
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: fastembed-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Enhanced FastEmbed gRPC server
+  fastembed-grpc:
+    build: .
+    container_name: fastembed-grpc
+    ports:
+      - "50051:50051"
+    volumes:
+      - model_cache:/app/models
+      - fastembed_cache:/app/.cache
+      # Mount host's HuggingFace cache if available
+      - /mnt/c/Users/ADAM/.cache/huggingface:/app/.cache/huggingface:ro
+    environment:
+      - GRPC_PORT=50051
+      - DEFAULT_MODEL=BAAI/bge-base-en-v1.5
+      - USE_CUDA=true
+      - DEFAULT_CHUNK_SIZE=512
+      - DEFAULT_CHUNK_OVERLAP=50
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION=documents
+      - CACHE_DIR=/app/.cache
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CUDA_VISIBLE_DEVICES=0
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    runtime: nvidia      
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, utility, compute]
+    
+  # FastAPI HTTP server (optional)
+  fastembed-http:
+    build: .
+    container_name: fastembed-http
+    ports:
+      - "50052:8000"
+    volumes:
+      - model_cache:/app/models
+      - fastembed_cache:/app/.cache
+    environment:
+      - START_HTTP=true
+      - HTTP_PORT=8000
+      - GRPC_PORT=50051
+      - DEFAULT_MODEL=BAAI/bge-base-en-v1.5
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION=documents
+    depends_on:
+      - fastembed-grpc
+    restart: unless-stopped
+    profiles:
+      - http
+
+volumes:
+  qdrant_data:
+    driver: local
+  model_cache:
+    driver: local
+  fastembed_cache:
+    driver: local

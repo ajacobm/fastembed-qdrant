@@ -7,11 +7,6 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     software-properties-common \
-    && add-apt-repository ppa:graphics-drivers/ppa \
-    && apt-get update \
-    && apt-get install -y \
-    libcudnn9-cuda-12 \
-    libcudnn9-dev-cuda-12 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -42,20 +37,23 @@ ENV CUDA_HOME=/usr/local/cuda
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 ENV PATH=/usr/local/cuda/bin:$PATH
 ENV CACHE_DIR=/app/.cache
-# Set Python path to include src directory
 ENV PYTHONPATH=/app/src
 
 # Default environment variables
 ENV GRPC_PORT=50051
 ENV HTTP_PORT=50052
 ENV DEFAULT_MODEL=sentence-transformers/all-MiniLM-L6-v2
-ENV USE_CUDA=true
+ENV USE_CUDA=false
 ENV DEFAULT_CHUNK_SIZE=512
 ENV DEFAULT_CHUNK_OVERLAP=50
+ENV START_MODE=both
 
-# Expose ports
+# Expose both ports
 EXPOSE 50051 50052
 
-# Default command runs the enhanced gRPC server
-# Use: docker run -e "START_HTTP=true" to run HTTP server instead
-CMD ["sh", "-c", "if [ \"$START_HTTP\" = \"true\" ]; then uv run python src/http_server.py; else uv run python src/enhanced_server.py; fi"]
+# Copy the unified startup script
+COPY start_unified.sh /app/start_unified.sh
+RUN chmod +x /app/start_unified.sh
+
+# Use the unified startup script that can run both services
+CMD ["/app/start_unified.sh"]

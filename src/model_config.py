@@ -43,6 +43,16 @@ FASTEMBED_MODELS = {
         license="mit",
         description="Text embeddings, Unimodal (text), Chinese, 512 sequence length"
     ),
+    "snowflake/snowflake-arctic-embed-xs": ModelConfig(
+        model_name="snowflake/snowflake-arctic-embed-xs",
+        dimensions=384,
+        max_length=512,
+        default_chunk_size=400,
+        default_chunk_overlap=50,
+        size_gb=0.090,
+        license="apache-2.0",
+        description="Text embeddings, Unimodal (text), English, 512 sequence length"
+    ),
     "sentence-transformers/all-MiniLM-L6-v2": ModelConfig(
         model_name="sentence-transformers/all-MiniLM-L6-v2",
         dimensions=384,
@@ -52,6 +62,16 @@ FASTEMBED_MODELS = {
         size_gb=0.090,
         license="apache-2.0",
         description="Text embeddings, Unimodal (text), English, 256 sequence length"
+    ),
+    "jinaai/jina-embeddings-v2-small-en": ModelConfig(
+        model_name="jinaai/jina-embeddings-v2-small-en",
+        dimensions=512,
+        max_length=8192,
+        default_chunk_size=2000,
+        default_chunk_overlap=200,
+        size_gb=0.120,
+        license="apache-2.0",
+        description="Text embeddings, Unimodal (text), English, 8192 sequence length"
     ),
     
     # Base models (balanced performance/size)
@@ -65,6 +85,46 @@ FASTEMBED_MODELS = {
         license="mit",
         description="Text embeddings, Unimodal (text), English, 512 sequence length"
     ),
+    "snowflake/snowflake-arctic-embed-m": ModelConfig(
+        model_name="snowflake/snowflake-arctic-embed-m",
+        dimensions=768,
+        max_length=512,
+        default_chunk_size=400,
+        default_chunk_overlap=50,
+        size_gb=0.430,
+        license="apache-2.0",
+        description="Text embeddings, Unimodal (text), English, 512 sequence length"
+    ),
+    "nomic-ai/nomic-embed-text-v1.5": ModelConfig(
+        model_name="nomic-ai/nomic-embed-text-v1.5",
+        dimensions=768,
+        max_length=8192,
+        default_chunk_size=2000,
+        default_chunk_overlap=200,
+        size_gb=0.520,
+        license="apache-2.0",
+        description="Text embeddings, Multimodal (text, image), English, 8192 sequence length"
+    ),
+    "jinaai/jina-embeddings-v2-base-en": ModelConfig(
+        model_name="jinaai/jina-embeddings-v2-base-en",
+        dimensions=768,
+        max_length=8192,
+        default_chunk_size=2000,
+        default_chunk_overlap=200,
+        size_gb=0.520,
+        license="apache-2.0",
+        description="Text embeddings, Unimodal (text), English, 8192 sequence length"
+    ),
+    "snowflake/snowflake-arctic-embed-m-long": ModelConfig(
+        model_name="snowflake/snowflake-arctic-embed-m-long",
+        dimensions=768,
+        max_length=2048,
+        default_chunk_size=1600,
+        default_chunk_overlap=150,
+        size_gb=0.540,
+        license="apache-2.0",
+        description="Text embeddings, Unimodal (text), English, 2048 sequence length"
+    ),
     
     # Large models (best performance)
     "BAAI/bge-large-en-v1.5": ModelConfig(
@@ -76,6 +136,46 @@ FASTEMBED_MODELS = {
         size_gb=1.200,
         license="mit",
         description="Text embeddings, Unimodal (text), English, 512 sequence length"
+    ),
+    "thenlper/gte-large": ModelConfig(
+        model_name="thenlper/gte-large",
+        dimensions=1024,
+        max_length=512,
+        default_chunk_size=400,
+        default_chunk_overlap=50,
+        size_gb=1.200,
+        license="mit",
+        description="Text embeddings, Unimodal (text), English, 512 sequence length"
+    ),
+    "snowflake/snowflake-arctic-embed-l": ModelConfig(
+        model_name="snowflake/snowflake-arctic-embed-l",
+        dimensions=1024,
+        max_length=512,
+        default_chunk_size=400,
+        default_chunk_overlap=50,
+        size_gb=1.020,
+        license="apache-2.0",
+        description="Text embeddings, Unimodal (text), English, 512 sequence length"
+    ),
+    "mixedbread-ai/mxbai-embed-large-v1": ModelConfig(
+        model_name="mixedbread-ai/mxbai-embed-large-v1",
+        dimensions=1024,
+        max_length=512,
+        default_chunk_size=400,
+        default_chunk_overlap=50,
+        size_gb=0.640,
+        license="apache-2.0",
+        description="Text embeddings, Unimodal (text), English, 512 sequence length"
+    ),
+    "intfloat/multilingual-e5-large": ModelConfig(
+        model_name="intfloat/multilingual-e5-large",
+        dimensions=1024,
+        max_length=512,
+        default_chunk_size=400,
+        default_chunk_overlap=50,
+        size_gb=2.240,
+        license="mit",
+        description="Text embeddings, Unimodal (text), Multilingual, 512 sequence length"
     ),
 }
 

@@ -132,6 +132,98 @@ class TextChunker:
         
         return chunks
     
+    def chunk_streaming_text(
+        self, 
+        text_generator: Generator[str, None, None],
+        base_metadata: Dict[str, Any] = None
+    ) -> Generator[TextChunk, None, None]:
+        """
+        Process streaming text and yield chunks as they become available.
+        
+        Args:
+            text_generator: Generator that yields text pieces
+            base_metadata: Base metadata to include in all chunks
+            
+        Yields:
+            TextChunk objects as they are created
+        """
+        base_metadata = base_metadata or {}
+        buffer = ""
+        chunk_index = 0
+        total_offset = 0
+        
+        for text_piece in text_generator:
+            buffer += text_piece
+            
+            # Process the buffer when it gets large enough
+            while len(buffer) > self.chunk_size + self.chunk_overlap:
+                # Find chunk boundary
+                chunk_end = self.chunk_size
+                
+                # Try to find sentence boundary
+                boundary_search_start = max(0, chunk_end - self.chunk_size // 10)
+                sentence_breaks = list(re.finditer(r'[.!?]\s+', buffer[boundary_search_start:chunk_end]))
+                
+                if sentence_breaks:
+                    chunk_end = boundary_search_start + sentence_breaks[-1].end()
+                else:
+                    # Try word boundary
+                    word_break = buffer.rfind(' ', boundary_search_start, chunk_end)
+                    if word_break > boundary_search_start:
+                        chunk_end = word_break
+                
+                # Extract chunk text
+                chunk_text = buffer[:chunk_end].strip()
+                
+                if chunk_text:
+                    chunk_metadata = base_metadata.copy()
+                    chunk_metadata.update({
+                        'chunk_size': len(chunk_text),
+                        'char_start': total_offset,
+                        'char_end': total_offset + len(chunk_text),
+                        'is_streaming': True
+                    })
+                    
+                    chunk = TextChunk(
+                        id=str(uuid.uuid4()),
+                        text=chunk_text,
+                        start_offset=total_offset,
+                        end_offset=total_offset + len(chunk_text),
+                        chunk_index=chunk_index,
+                        metadata=chunk_metadata
+                    )
+                    
+                    yield chunk
+                    chunk_index += 1
+                
+                # Update buffer and offset
+                overlap_start = max(0, chunk_end - self.chunk_overlap)
+                buffer = buffer[overlap_start:]
+                total_offset += overlap_start
+        
+        # Process remaining buffer
+        if buffer.strip():
+            chunk_text = buffer.strip()
+            chunk_metadata = base_metadata.copy()
+            chunk_metadata.update({
+                'chunk_size': len(chunk_text),
+                'char_start': total_offset,
+                'char_end': total_offset + len(chunk_text),
+                'is_streaming': True,
+                'is_final_chunk': True
+            })
+            
+            chunk = TextChunk(
+                id=str(uuid.uuid4()),
+                text=chunk_text,
+                start_offset=total_offset,
+                end_offset=total_offset + len(chunk_text),
+                chunk_index=chunk_index,
+                metadata=chunk_metadata
+            )
+            
+            yield chunk
+    
     def _clean_text(self, text: str) -> str:
         """Clean and normalize text."""
         # Remove excessive whitespace

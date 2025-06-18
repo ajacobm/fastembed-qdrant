@@ -1,89 +1,99 @@
 version: '3.8'
 
 services:
-  # Qdrant vector database
-  qdrant:
-    image: qdrant/qdrant:v1.7.4
-    container_name: fastembed-qdrant
+  # Unified FastEmbed service (both gRPC and HTTP)
+  fastembed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ajacobm/fastembed-qdrant:v2
+    container_name: fastembed-v2
     ports:
-      - "6333:6333"
-      - "6334:6334"
+      - "50051:50051"  # gRPC
+      - "50052:50052"  # HTTP API
     volumes:
-      - qdrant_data:/qdrant/storage
+      # Use host HuggingFace cache for models (read-only)
+      - /mnt/c/Users/ADAM/.cache/huggingface:/app/.cache/huggingface:ro
+      # Writable cache for FastEmbed-specific files
+      - ./cache:/app/.cache:rw
+    env_file:
+      - .env
     environment:
-      - QDRANT__SERVICE__HTTP_PORT=6333
-      - QDRANT__SERVICE__GRPC_PORT=6334
+      - START_MODE=both
+      - QDRANT_HOST=host.docker.internal  # Connect to external Kubernetes Qdrant
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:50052/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     restart: unless-stopped
-
-  # Enhanced FastEmbed gRPC server
-  fastembed-grpc:
-    build: .
-    container_name: fastembed-grpc
-    ports:
-      - "50051:50051"
-    volumes:
-      - model_cache:/app/models
-      - fastembed_cache:/app/.cache
-      # Mount host's HuggingFace cache if available
-      - /mnt/c/Users/ADAM/.cache/huggingface:/app/.cache/huggingface:ro
-    environment:
-      - GRPC_PORT=50051
-      - DEFAULT_MODEL=BAAI/bge-base-en-v1.5
-      - USE_CUDA=true
-      - DEFAULT_CHUNK_SIZE=512
-      - DEFAULT_CHUNK_OVERLAP=50
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - QDRANT_COLLECTION=documents
-      - CACHE_DIR=/app/.cache
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
-      - CUDA_VISIBLE_DEVICES=0
-    depends_on:
-      qdrant:
-        condition: service_healthy
-    restart: unless-stopped
-    runtime: nvidia      
+    # Optional: Enable GPU support (comment out for CPU-only)
+    runtime: nvidia
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              count: 2
               capabilities: [gpu, utility, compute]
-    
-  # FastAPI HTTP server (optional)
-  fastembed-http:
-    build: .
-    container_name: fastembed-http
+
+  # Alternative: Separate services configuration
+  fastembed-grpc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ajacobm/fastembed-qdrant:v2
+    container_name: fastembed-grpc-only
     ports:
-      - "50052:8000"
+      - "50051:50051"  # Different port to avoid conflicts
     volumes:
-      - model_cache:/app/models
-      - fastembed_cache:/app/.cache
+      - /mnt/c/Users/ADAM/.cache/huggingface:/app/.cache/huggingface:ro
+      - ./cache:/app/.cache:rw
+    env_file:
+      - .env
     environment:
-      - START_HTTP=true
-      - HTTP_PORT=8000
-      - GRPC_PORT=50051
-      - DEFAULT_MODEL=BAAI/bge-base-en-v1.5
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - QDRANT_COLLECTION=documents
-    depends_on:
-      - fastembed-grpc
+      - START_MODE=grpc
+      - QDRANT_HOST=host.docker.internal
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import grpc; channel = grpc.insecure_channel('localhost:50051'); channel.close()\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
     profiles:
-      - http
+      - separate  # Only start with --profile separate
 
-volumes:
-  qdrant_data:
-    driver: local
-  model_cache:
-    driver: local
-  fastembed_cache:
-    driver: local
+  fastembed-http:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ajacobm/fastembed-qdrant:v2
+    container_name: fastembed-http-only
+    ports:
+      - "50052:50052"  # Different port to avoid conflicts
+    volumes:
+      - /mnt/c/Users/ADAM/.cache/huggingface:/app/.cache/huggingface:ro
+      - ./cache:/app/.cache:rw
+    env_file:
+      - .env
+    environment:
+      - START_MODE=http
+      - QDRANT_HOST=host.docker.internal
+      - GRPC_HOST=fastembed-grpc-only
+      - GRPC_PORT=50051
+    depends_on:
+      fastembed-grpc:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    profiles:
+      - separate  # Only start with --profile separate
+
+# No volumes section needed - using bind mounts for better control

@@ -6,6 +6,7 @@ import logging
 import uuid
 from typing import List, Dict, Any, Optional, Tuple
 import asyncio
+from dataclasses import asdict
 
 from qdrant_client import QdrantClient, AsyncQdrantClient
 from qdrant_client.models import (
@@ -33,7 +34,7 @@ class QdrantEmbeddingStore:
         try:
             # Initialize async client
             self._async_client = AsyncQdrantClient(
-                host=self.config.host,
+                host=self.config.host, # should not contain "http://" or "https://"
                 port=self.config.port,
                 api_key=self.config.api_key,
                 timeout=self.config.timeout,
@@ -146,6 +147,7 @@ class QdrantEmbeddingStore:
                     'start_offset': chunk.start_offset,
                     'end_offset': chunk.end_offset,
                     'chunk_size': len(chunk.text),
+                    'created_at': None,  # Will be set by Qdrant
                 }
                 
                 # Add document ID if provided
@@ -198,6 +200,108 @@ class QdrantEmbeddingStore:
         except Exception as e:
             logger.error(f"Error storing embeddings in Qdrant: {e}")
             return False, []
+    
+    async def search_similar(
+        self,
+        collection_name: str,
+        query_vector: List[float],
+        limit: int = 10,
+        filter_conditions: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for similar embeddings in Qdrant.
+        
+        Args:
+            collection_name: Name of the collection
+            query_vector: Query embedding vector
+            limit: Maximum number of results
+            filter_conditions: Optional filter conditions
+            
+        Returns:
+            List of search results with scores and metadata
+        """
+        try:
+            search_filter = None
+            if filter_conditions:
+                conditions = []
+                for key, value in filter_conditions.items():
+                    condition = FieldCondition(key=key, match=MatchValue(value=value))
+                    conditions.append(condition)
+                search_filter = Filter(must=conditions)
+            
+            results = await self._async_client.search(
+                collection_name=collection_name,
+                query_vector=query_vector,
+                limit=limit,
+                query_filter=search_filter,
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            return [
+                {
+                    'id': result.id,
+                    'score': result.score,
+                    'payload': result.payload
+                }
+                for result in results
+            ]
+            
+        except Exception as e:
+            logger.error(f"Error searching in Qdrant: {e}")
+            return []
+    
+    async def delete_document(
+        self,
+        collection_name: str,
+        document_id: str
+    ) -> bool:
+        """
+        Delete all chunks belonging to a document.
+        
+        Args:
+            collection_name: Name of the collection
+            document_id: Document identifier
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            filter_condition = Filter(
+                must=[
+                    FieldCondition(
+                        key="document_id",
+                        match=MatchValue(value=document_id)
+                    )
+                ]
+            )
+            
+            result = await self._async_client.delete(
+                collection_name=collection_name,
+                points_selector=filter_condition
+            )
+            
+            logger.info(f"Deleted document {document_id} from {collection_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting document {document_id}: {e}")
+            return False
+    
+    async def get_collection_stats(self, collection_name: str) -> Optional[Dict[str, Any]]:
+        """Get statistics about a collection."""
+        try:
+            info = await self._async_client.get_collection(collection_name)
+            return {
+                'points_count': info.points_count,
+                'segments_count': info.segments_count,
+                'vector_size': info.config.params.vectors.size,
+                'distance_metric': info.config.params.vectors.distance.name,
+                'status': info.status.name
+            }
+        except Exception as e:
+            logger.error(f"Error getting collection stats for {collection_name}: {e}")
+            return None
     
     async def health_check(self) -> bool:
         """Check if Qdrant is healthy and reachable."""

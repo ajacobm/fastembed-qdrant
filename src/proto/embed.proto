@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package fastembed.proto;
+package proto;
 
 service EmbeddingService {
   rpc GetEmbeddings (EmbeddingRequest) returns (EmbeddingResponse) {}
@@ -13,6 +13,7 @@ service EmbeddingService {
 
   rpc ListModels (ListModelsRequest) returns (ListModelsResponse) {}
 
+  // NEW: Update model config and qdrant collection at runtime
   rpc UpdateModelConfig (UpdateModelConfigRequest) returns (UpdateModelConfigResponse) {}
 }
 
@@ -104,6 +105,7 @@ message ListModelsResponse {
   repeated ModelInfo models = 1;
 }
 
+// ========== NEW FOR DYNAMIC CONFIG UPDATE ==========
 message UpdateModelConfigRequest {
   string model_name = 1;
   string qdrant_collection = 2;
