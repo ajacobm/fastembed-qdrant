@@ -30,10 +30,13 @@ print_usage() {
     echo "  test-grpc       - Run gRPC client example"
     echo "  test-http       - Test HTTP endpoints"
     echo "  test-observability - Test observability features"
+    echo "  test-health     - Test enhanced health check system"
     echo "  demo-observability - Run observability demo"
+    echo "  demo-health     - Demo enhanced health check functionality"
     echo "  run-grpc        - Run gRPC server locally"
     echo "  run-http        - Run HTTP server locally"
     echo "  run-http-obs    - Run HTTP server with observability"
+    echo "  run-http-enhanced - Run HTTP server with enhanced health checks"
     echo "  run-http-obs-metrics - Run HTTP server with observability and metrics"
     echo "  run-enhanced    - Run enhanced server with observability"
     echo "  docker-build    - Build Docker image"
@@ -124,6 +127,40 @@ run_http_server_observability() {
     echo ""
     
     uv run python src/http_server.py
+}
+
+# Run HTTP server with enhanced health checks
+run_http_enhanced() {
+    echo -e "${GREEN}Starting FastEmbed HTTP server with enhanced health checks...${NC}"
+    export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
+    export PATH="${HOME}/.local/bin:$PATH"
+    
+    # Set default environment variables for enhanced health checks
+    export HTTP_PORT=8080
+    export GRPC_PORT=50051
+    export LOG_LEVEL=${LOG_LEVEL:-"INFO"}
+    export LOG_FORMAT=${LOG_FORMAT:-"json"}
+    export LOG_OUTPUT=${LOG_OUTPUT:-"console"}
+    
+    # Health check configuration
+    export HEALTH_ENABLE=true
+    export HEALTH_CONTAINER_MONITORING=true
+    export HEALTH_STARTUP_GRACE=120
+    
+    echo -e "${YELLOW}Enhanced HTTP Server configuration:${NC}"
+    echo "  HTTP Port: $HTTP_PORT"
+    echo "  gRPC Port: $GRPC_PORT"
+    echo "  API Docs: http://localhost:$HTTP_PORT/docs"
+    echo "  Health Endpoints:"
+    echo "    Basic:      http://localhost:$HTTP_PORT/health"
+    echo "    Detailed:   http://localhost:$HTTP_PORT/health/detailed"
+    echo "    Diagnostic: http://localhost:$HTTP_PORT/health/diagnostic"
+    echo "    Readiness:  http://localhost:$HTTP_PORT/readiness"
+    echo "    Liveness:   http://localhost:$HTTP_PORT/liveness"
+    echo "    Metrics:    http://localhost:$HTTP_PORT/metrics/health"
+    echo ""
+    
+    uv run python src/http_server_enhanced.py
 }
 
 run_http_server_observability_metrics() {
@@ -271,6 +308,71 @@ print('✅ Observability system working correctly!')
     echo -e "${GREEN}Observability tests completed${NC}"
 }
 
+# Test enhanced health check system
+test_health() {
+    echo -e "${GREEN}Testing enhanced health check system...${NC}"
+    
+    # Test health check script
+    echo -e "${YELLOW}Testing health check script...${NC}"
+    ./docker-health-check.sh --help
+    
+    # If server is running, test actual endpoints
+    if curl -f -s http://localhost:8080/health >/dev/null 2>&1; then
+        echo -e "${GREEN}Server is running, testing health endpoints...${NC}"
+        
+        echo -e "${YELLOW}Basic health check:${NC}"
+        ./docker-health-check.sh --level basic --verbose
+        
+        echo -e "${YELLOW}\nDetailed health check:${NC}"
+        ./docker-health-check.sh --level detailed --verbose
+        
+        echo -e "${YELLOW}\nReadiness probe:${NC}"
+        ./docker-health-check.sh --readiness --verbose
+        
+        echo -e "${YELLOW}\nLiveness probe:${NC}"
+        ./docker-health-check.sh --liveness --verbose
+    else
+        echo -e "${YELLOW}Server not running, start with './dev.sh run-http-enhanced' first${NC}"
+    fi
+}
+
+# Demo enhanced health check functionality
+demo_health() {
+    echo -e "${GREEN}Enhanced Health Check Demo${NC}"
+    echo -e "${BLUE}============================${NC}"
+    
+    # Show container environment detection
+    echo -e "${YELLOW}Container Environment Detection:${NC}"
+    if [[ -f "/.dockerenv" ]] || [[ -n "${KUBERNETES_SERVICE_HOST}" ]]; then
+        echo "  Running in: Container"
+    else
+        echo "  Running in: Host"
+    fi
+    
+    # Test health endpoints if server is running
+    if curl -f -s http://localhost:8080/health >/dev/null 2>&1; then
+        echo -e "${YELLOW}\nTesting Health Endpoints:${NC}"
+        
+        echo -e "${YELLOW}\n1. Basic Health Check:${NC}"
+        curl -s http://localhost:8080/health | python3 -m json.tool
+        
+        echo -e "${YELLOW}\n2. Detailed Health Check:${NC}"
+        curl -s http://localhost:8080/health/detailed | python3 -m json.tool
+        
+        echo -e "${YELLOW}\n3. Readiness Probe:${NC}"
+        curl -s http://localhost:8080/readiness | python3 -m json.tool
+        
+        echo -e "${YELLOW}\n4. Liveness Probe:${NC}"
+        curl -s http://localhost:8080/liveness | python3 -m json.tool
+        
+        echo -e "${YELLOW}\n5. Health Metrics (Prometheus format):${NC}"
+        curl -s http://localhost:8080/metrics/health
+        
+    else
+        echo -e "${YELLOW}\nServer not running! Start with: ./dev.sh run-http-enhanced${NC}"
+    fi
+}
+
 demo_observability() {
     echo -e "${GREEN}Running observability demo...${NC}"
     export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
@@ -368,8 +470,14 @@ case "${1:-help}" in
     test-observability)
         test_observability
         ;;
+    test-health)
+        test_health
+        ;;
     demo-observability)
         demo_observability
+        ;;
+    demo-health)
+        demo_health
         ;;
     run-grpc)
         run_grpc_server
@@ -379,6 +487,9 @@ case "${1:-help}" in
         ;;
     run-http-obs)
         run_http_server_observability
+        ;;
+    run-http-enhanced)
+        run_http_enhanced
         ;;
     run-http-obs-metrics)
         run_http_server_observability_metrics

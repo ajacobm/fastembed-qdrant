@@ -28,6 +28,9 @@ dependencies = [
     "structlog>=23.2.0",
     "python-json-logger>=2.0.0",
     "prometheus-client>=0.22.1",
+    # Health check dependencies
+    "psutil>=5.9.0",
+    "GPUtil>=1.4.0",
 ]
 
 [project.optional-dependencies]

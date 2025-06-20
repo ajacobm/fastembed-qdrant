@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import embed_pb2 as embed__pb2
+from . import embed_pb2 as embed__pb2
 
 GRPC_GENERATED_VERSION = '1.73.0'
 GRPC_VERSION = grpc.__version__
