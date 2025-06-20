@@ -23,6 +23,9 @@ COPY src/ src/
 RUN uv venv --seed && \
     uv pip install -r requirements.txt
 
+# Add missing dependencies for health checking
+RUN uv pip install psutil GPUtil
+
 # Generate protobuf files
 RUN uv run python -m grpc_tools.protoc \
     --proto_path=src/proto \
@@ -49,22 +52,43 @@ ENV DEFAULT_CHUNK_SIZE=512
 ENV DEFAULT_CHUNK_OVERLAP=50
 ENV START_MODE=both
 
-# Expose both ports
-EXPOSE 50051 50052
-
-# Copy startup scripts and environment loader
-COPY start_unified_improved.sh /app/start_unified_improved.sh
-COPY load_env.sh /app/load_env.sh
-RUN chmod +x /app/start_unified_improved.sh /app/load_env.sh
-
-# Health check configuration
+# Enhanced health check configuration with container boundary awareness
 ENV GRPC_STARTUP_TIMEOUT=300
 ENV GRPC_HEALTH_CHECK_INTERVAL=5
 ENV HTTP_STARTUP_TIMEOUT=60
 
-# Health check for Docker
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
-    CMD curl -f http://localhost:${HTTP_PORT:-50052}/health || exit 1
+# Health check system configuration
+ENV HEALTH_ENABLE=true
+ENV HEALTH_CHECK_INTERVAL=30
+ENV HEALTH_STARTUP_GRACE=120
+ENV HEALTH_CONTAINER_MONITORING=true
+ENV HEALTH_MEMORY_THRESHOLD=85.0
+ENV HEALTH_CPU_THRESHOLD=90.0
+ENV HEALTH_DISK_THRESHOLD=90.0
+
+# Observability configuration
+ENV LOG_LEVEL=INFO
+ENV LOG_FORMAT=json
+ENV LOG_OUTPUT=console
+
+# Expose both ports
+EXPOSE 50051 50052
+
+# Copy startup scripts and environment loader
+COPY start_with_http.sh /app/start_with_http.sh
+COPY load_env.sh /app/load_env.sh
+RUN chmod +x /app/start_with_http.sh /app/load_env.sh
+
+# Docker health check with enhanced container boundary awareness
+# Uses a layered approach: basic connectivity -> detailed health -> full diagnostic
+HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=5 \
+    CMD curl -f http://localhost:${HTTP_PORT:-50052}/health || \
+        curl -f http://localhost:${HTTP_PORT:-50052}/health/detailed || \
+        curl -f http://localhost:${HTTP_PORT:-50052}/liveness || exit 1
+
+# Health check script for manual use and Kubernetes
+COPY docker-health-check.sh /app/docker-health-check.sh
+RUN chmod +x /app/docker-health-check.sh
 
 # Use the improved unified startup script
-CMD ["/app/start_unified_improved.sh"]
+CMD ["/app/start_with_http.sh"]

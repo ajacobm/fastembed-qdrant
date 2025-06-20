@@ -46,7 +46,7 @@ check_grpc_port() {
 # Function to check if gRPC service is responding (basic connectivity)
 check_grpc_connectivity() {
     local port="${1:-50051}"
-    PYTHONPATH=/app/src python3 -c "
+    PYTHONPATH=/app/src uv run python -c "
 import grpc
 import sys
 
@@ -67,15 +67,15 @@ except Exception as e:
 check_grpc_health() {
     local port="${1:-50051}"
     # Try to connect to gRPC server using Python client
-    PYTHONPATH=/app/src python3 -c "
+    PYTHONPATH=/app/src uv run python -c "
 import grpc
 import sys
 import os
 sys.path.insert(0, '/app/src')
 
 try:
-    from embed_pb2_grpc import EmbeddingServiceStub
-    from embed_pb2 import StatusRequest
+    from proto.embed_pb2_grpc import EmbeddingServiceStub
+    from proto.embed_pb2 import StatusRequest
     
     channel = grpc.insecure_channel('localhost:${port}')
     stub = EmbeddingServiceStub(channel)
