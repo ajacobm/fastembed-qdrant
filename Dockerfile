@@ -75,9 +75,9 @@ ENV LOG_OUTPUT=console
 EXPOSE 50051 50052
 
 # Copy startup scripts and environment loader
-COPY start_unified_improved.sh /app/start_unified_improved.sh
+COPY start_with_http.sh /app/start_with_http.sh
 COPY load_env.sh /app/load_env.sh
-RUN chmod +x /app/start_unified_improved.sh /app/load_env.sh
+RUN chmod +x /app/start_with_http.sh /app/load_env.sh
 
 # Docker health check with enhanced container boundary awareness
 # Uses a layered approach: basic connectivity -> detailed health -> full diagnostic
@@ -91,4 +91,4 @@ COPY docker-health-check.sh /app/docker-health-check.sh
 RUN chmod +x /app/docker-health-check.sh
 
 # Use the improved unified startup script
-CMD ["/app/start_unified_improved.sh"]
+CMD ["/app/start_with_http.sh"]
