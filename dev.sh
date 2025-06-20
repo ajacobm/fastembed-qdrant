@@ -34,6 +34,7 @@ print_usage() {
     echo "  run-grpc        - Run gRPC server locally"
     echo "  run-http        - Run HTTP server locally"
     echo "  run-http-obs    - Run HTTP server with observability"
+    echo "  run-http-obs-metrics - Run HTTP server with observability and metrics"
     echo "  run-enhanced    - Run enhanced server with observability"
     echo "  docker-build    - Build Docker image"
     echo "  docker-up       - Start services with Docker Compose"
@@ -98,7 +99,7 @@ run_grpc_server() {
     echo "  Use CUDA: $USE_CUDA"
     echo ""
     
-    uv run python src/enhanced_server.py
+    uv run python src/grpc_server.py
 }
 
 run_http_server_observability() {
@@ -122,7 +123,34 @@ run_http_server_observability() {
     echo "  Log Output: $LOG_OUTPUT"
     echo ""
     
-    uv run python src/http_server_with_observability.py
+    uv run python src/http_server.py
+}
+
+run_http_server_observability_metrics() {
+    echo -e "${GREEN}Starting FastEmbed HTTP server with observability and metrics...${NC}"
+    export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
+    export PATH="${HOME}/.local/bin:$PATH"
+    
+    # Set default environment variables for observability and metrics
+    export HTTP_PORT=8000
+    export GRPC_PORT=50051
+    export LOG_LEVEL=${LOG_LEVEL:-"INFO"}
+    export LOG_FORMAT=${LOG_FORMAT:-"json"}
+    export LOG_OUTPUT=${LOG_OUTPUT:-"console"}
+    export METRICS_ENABLED=true
+    export METRICS_PORT=9090
+    
+    echo -e "${YELLOW}HTTP Server with Observability and Metrics configuration:${NC}"
+    echo "  HTTP Port: $HTTP_PORT"
+    echo "  gRPC Port: $GRPC_PORT"
+    echo "  API Docs: http://localhost:$HTTP_PORT/docs"
+    echo "  Metrics Port: $METRICS_PORT"
+    echo "  Log Level: $LOG_LEVEL"
+    echo "  Log Format: $LOG_FORMAT"
+    echo "  Log Output: $LOG_OUTPUT"
+    echo ""
+    
+    uv run python src/http_server.py
 }
 
 run_enhanced_server() {
@@ -253,7 +281,7 @@ demo_observability() {
 
 docker_build() {
     echo -e "${GREEN}Building Docker image...${NC}"
-    docker build -t fastembed-qdrant:latest .
+    docker build -t ajacobm/fastembed-qdrant:v2 .
     echo -e "${GREEN}Docker image built successfully${NC}"
 }
 
@@ -265,12 +293,12 @@ docker_up() {
         echo -e "${YELLOW}Services started with HTTP API${NC}"
         echo -e "${YELLOW}gRPC: localhost:50051${NC}"
         echo -e "${YELLOW}HTTP: localhost:50052${NC}"
-        echo -e "${YELLOW}Qdrant: localhost:6333${NC}"
+        # echo -e "${YELLOW}Qdrant: localhost:6333${NC}"
     else
         docker-compose up -d
         echo -e "${YELLOW}Services started (gRPC only)${NC}"
         echo -e "${YELLOW}gRPC: localhost:50051${NC}"
-        echo -e "${YELLOW}Qdrant: localhost:6333${NC}"
+        # echo -e "${YELLOW}Qdrant: localhost:6333${NC}"
     fi
     
     echo ""
@@ -351,6 +379,9 @@ case "${1:-help}" in
         ;;
     run-http-obs)
         run_http_server_observability
+        ;;
+    run-http-obs-metrics)
+        run_http_server_observability_metrics
         ;;
     run-enhanced)
         run_enhanced_server

@@ -20,7 +20,7 @@ echo "DEFAULT_MODEL: ${DEFAULT_MODEL:-sentence-transformers/all-MiniLM-L6-v2}"
 # Function to start gRPC server
 start_grpc() {
     echo "Starting FastEmbed gRPC server on port ${GRPC_PORT:-50051}..."
-    exec uv run python src/enhanced_server.py
+    exec uv run python src/grpc_server.py
 }
 
 # Function to start HTTP server
@@ -35,7 +35,7 @@ start_both() {
     
     # Start gRPC server in background
     echo "Starting gRPC server..."
-    uv run python src/enhanced_server.py &
+    uv run python src/grpc_server.py &
     GRPC_PID=$!
     
     # Wait for gRPC server to be ready

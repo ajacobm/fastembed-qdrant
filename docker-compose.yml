@@ -16,17 +16,21 @@ services:
       - /mnt/c/Users/ADAM/.cache/huggingface:/app/.cache/huggingface:ro
       # Writable cache for FastEmbed-specific files
       - ./cache:/app/.cache:rw
+      # Mount .env file explicitly
+      - ./.env:/app/.env:ro
+      # Mount load_env.sh script
+      - ./load_env.sh:/app/load_env.sh:ro
     env_file:
       - .env
     environment:
       - START_MODE=both
       - QDRANT_HOST=host.docker.internal  # Connect to external Kubernetes Qdrant
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:50052/health || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:50052/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 10
+      start_period: 300s
     restart: unless-stopped
     # Optional: Enable GPU support (comment out for CPU-only)
     runtime: nvidia

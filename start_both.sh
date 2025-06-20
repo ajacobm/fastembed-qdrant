@@ -2,7 +2,7 @@
 # Start both gRPC and HTTP servers
 
 echo "Starting Enhanced FastEmbed gRPC server..."
-uv run python src/enhanced_server.py &
+uv run python src/grpc_server.py &
 GRPC_PID=$!
 
 # Wait a bit for gRPC server to start

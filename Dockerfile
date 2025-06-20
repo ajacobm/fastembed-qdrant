@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     software-properties-common \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -25,7 +26,7 @@ RUN uv venv --seed && \
 # Generate protobuf files
 RUN uv run python -m grpc_tools.protoc \
     --proto_path=src/proto \
-    --python_out=src \
+    --python_out=src/proto \
     --grpc_python_out=src \
     src/proto/embed.proto
 
@@ -51,9 +52,19 @@ ENV START_MODE=both
 # Expose both ports
 EXPOSE 50051 50052
 
-# Copy the unified startup script
-COPY start_unified.sh /app/start_unified.sh
-RUN chmod +x /app/start_unified.sh
+# Copy startup scripts and environment loader
+COPY start_unified_improved.sh /app/start_unified_improved.sh
+COPY load_env.sh /app/load_env.sh
+RUN chmod +x /app/start_unified_improved.sh /app/load_env.sh
 
-# Use the unified startup script that can run both services
-CMD ["/app/start_unified.sh"]
+# Health check configuration
+ENV GRPC_STARTUP_TIMEOUT=300
+ENV GRPC_HEALTH_CHECK_INTERVAL=5
+ENV HTTP_STARTUP_TIMEOUT=60
+
+# Health check for Docker
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
+    CMD curl -f http://localhost:${HTTP_PORT:-50052}/health || exit 1
+
+# Use the improved unified startup script
+CMD ["/app/start_unified_improved.sh"]

@@ -4,7 +4,7 @@
 FastEmbed HTTP Server v2.0 now has full observability integration with structured logging and request correlation.
 
 KEY FEATURES IMPLEMENTED:
-1. **Complete HTTP Server with Observability** (src/http_server_with_observability.py)
+1. **Complete HTTP Server with Observability** (src/http_server.py)
    - Full request correlation with unique request IDs
    - Comprehensive error handling with structured logging
    - Operation context tracking for all gRPC calls
@@ -67,7 +67,7 @@ CONFIGURATION:
 
 USAGE:
 - Development: ./dev.sh run-http-obs
-- Production: python src/http_server_with_observability.py
+- Production: python src/http_server.py
 - Testing: python demo_http_observability.py
 - Configuration: Set LOG_* environment variables
 

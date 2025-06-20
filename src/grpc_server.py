@@ -152,11 +152,9 @@ class EnhancedEmbeddingService(embed_pb2_grpc.EmbeddingServiceServicer):
                         threads=self.config.embedding_threads
                     )
                     if success:
-                        logger.info("Default model loaded successfully", 
-                                   model=self.config.default_model, **model_op)
+                        logger.info("Default model loaded successfully", **model_op)
                     else:
-                        logger.warning("Failed to load default model", 
-                                     model=self.config.default_model, **model_op)
+                        logger.warning("Failed to load default model", **model_op)
 
     async def load_model(
         self,
@@ -171,13 +169,12 @@ class EnhancedEmbeddingService(embed_pb2_grpc.EmbeddingServiceServicer):
         try:
             with operation_context("model_loading", model=model_name, use_cuda=use_cuda) as op:
                 if self.model_name == model_name:
-                    logger.info("Model already loaded", model=model_name, **op)
+                    logger.info("Model already loaded", **op)
                     return True
 
                 # Validate model name
                 if not validate_model_name(model_name):
-                    logger.warning("Model not in supported list, attempting to load", 
-                                 model=model_name, **op)
+                    logger.warning("Model not in supported list, attempting to load", **op)
 
                 # Configure providers based on CUDA availability
                 providers = []
@@ -186,7 +183,6 @@ class EnhancedEmbeddingService(embed_pb2_grpc.EmbeddingServiceServicer):
                 providers.append("CPUExecutionProvider")
 
                 logger.info("Initializing model", 
-                          model=model_name, 
                           providers=[p[0] if isinstance(p, tuple) else p for p in providers], 
                           **op)
 
@@ -204,7 +200,6 @@ class EnhancedEmbeddingService(embed_pb2_grpc.EmbeddingServiceServicer):
                 
                 duration = time.time() - start_time
                 logger.info("Model loaded successfully", 
-                          model=model_name, 
                           duration=duration,
                           **op)
                 
@@ -572,20 +567,44 @@ class EnhancedEmbeddingService(embed_pb2_grpc.EmbeddingServiceServicer):
         with RequestContext(request_id, method="GetStatus") as ctx:
             logger.info("GetStatus request received")
             
-            # Check Qdrant connection
+            # Determine server state
+            if self.model is None and self.config.default_model:
+                server_state = f"Initializing (loading {self.config.default_model})"
+                current_model = f"Loading {self.config.default_model}..."
+            elif self.model is None:
+                server_state = "Ready (no model loaded)"
+                current_model = "No model loaded"
+            else:
+                server_state = "Ready"
+                current_model = self.model_name or "Unknown model"
+            
+            # Check Qdrant connection (with timeout to avoid blocking)
             qdrant_connected = False
-            if self.qdrant_store:
-                with operation_context("qdrant_health_check") as op:
-                    qdrant_connected = await self.qdrant_store.health_check()
-                    logger.info("Qdrant health check completed", 
-                               connected=qdrant_connected, **op)
+            try:
+                if self.qdrant_store:
+                    with operation_context("qdrant_health_check") as op:
+                        # Quick health check with timeout
+                        qdrant_connected = await asyncio.wait_for(
+                            self.qdrant_store.health_check(), 
+                            timeout=2.0
+                        )
+                        logger.info("Qdrant health check completed", 
+                                   connected=qdrant_connected, **op)
+            except asyncio.TimeoutError:
+                logger.warning("Qdrant health check timed out")
+                qdrant_connected = False
+            except Exception as e:
+                logger.warning("Qdrant health check failed", error=str(e))
+                qdrant_connected = False
 
             # Get configuration info including current model configuration
             env_vars = get_env_variables()
             config_info = {
+                "server_state": server_state,
                 "grpc_port": str(self.config.grpc_port),
                 "cache_dir": self.config.cache_dir,
                 "use_cuda": str(self.config.use_cuda),
+                "default_model": self.config.default_model or "Not configured",
                 "qdrant_host": env_vars.get("QDRANT_HOST", "Not configured"),
                 "qdrant_collection": env_vars.get("QDRANT_COLLECTION", "Not configured"),
                 "log_level": env_vars.get("LOG_LEVEL", "INFO"),
@@ -593,29 +612,34 @@ class EnhancedEmbeddingService(embed_pb2_grpc.EmbeddingServiceServicer):
             }
             
             # Add current model configuration if a model is loaded
-            if self.model_name:
-                model_config = get_model_config(self.model_name)
-                if model_config:
-                    config_info.update({
-                        "model_dimensions": str(model_config.dimensions),
-                        "model_max_length": str(model_config.max_length),
-                        "current_chunk_size": str(self.chunk_size or model_config.default_chunk_size),
-                        "current_chunk_overlap": str(self.chunk_overlap or model_config.default_chunk_overlap),
-                        "model_size_gb": str(model_config.size_gb),
-                        "model_license": model_config.license,
-                        "model_description": model_config.description,
-                        "current_qdrant_collection": self.qdrant_collection or env_vars.get("QDRANT_COLLECTION", "Not configured")
-                    })
+            if self.model_name and self.model is not None:
+                try:
+                    model_config = get_model_config(self.model_name)
+                    if model_config:
+                        config_info.update({
+                            "model_dimensions": str(model_config.dimensions),
+                            "model_max_length": str(model_config.max_length),
+                            "current_chunk_size": str(self.chunk_size or model_config.default_chunk_size),
+                            "current_chunk_overlap": str(self.chunk_overlap or model_config.default_chunk_overlap),
+                            "model_size_gb": str(model_config.size_gb),
+                            "model_license": model_config.license,
+                            "model_description": model_config.description,
+                            "current_qdrant_collection": self.qdrant_collection or env_vars.get("QDRANT_COLLECTION", "Not configured")
+                        })
+                except Exception as e:
+                    logger.warning("Could not get model config details", error=str(e))
+                    config_info["model_config_error"] = str(e)
 
             uptime = int(time.time() - self.start_time)
 
             logger.info("GetStatus request completed", 
                        uptime_seconds=uptime,
-                       current_model=self.model_name or "No model loaded")
+                       server_state=server_state,
+                       current_model=current_model)
 
             return StatusResponse(
-                server_version="2.0.0",
-                current_model=self.model_name or "No model loaded",
+                server_version="2.0.0-enhanced",
+                current_model=current_model,
                 cuda_available=self.cuda_available,
                 qdrant_connected=qdrant_connected,
                 configuration=config_info,
@@ -744,27 +768,49 @@ async def serve():
     embedding_service = EnhancedEmbeddingService(config)
     embed_pb2_grpc.add_EmbeddingServiceServicer_to_server(embedding_service, server)
 
-    # Initialize the service
-    with operation_context("service_initialization") as op:
-        await embedding_service.initialize()
-        logger.info("Service initialization completed", **op)
-
-    # Listen on configured port
+    # Listen on configured port and start server BEFORE initialization
     listen_addr = f'[::]:{config.grpc_port}'
     server.add_insecure_port(listen_addr)
     logger.info("gRPC server configured", listen_addr=listen_addr)
 
-    # Start server
+    # Start server to accept connections immediately
     await server.start()
+    logger.info("Enhanced FastEmbed Server started and accepting connections",
+               status="started",
+               listen_addr=listen_addr,
+               note="Service initialization will happen in background")
+    
+    # Initialize the service in background (non-blocking)
+    async def background_initialization():
+        try:
+            with operation_context("background_service_initialization") as op:
+                logger.info("Starting background service initialization...")
+                await embedding_service.initialize()
+                logger.info("Background service initialization completed successfully", **op)
+        except Exception as e:
+            logger.error("Background service initialization failed", 
+                        error=str(e), exc_info=True)
+    
+    # Start background initialization task
+    initialization_task = asyncio.create_task(background_initialization())
+    
     logger.info("Enhanced FastEmbed Server is ready to accept connections",
                status="ready",
-               listen_addr=listen_addr)
+               listen_addr=listen_addr,
+               initialization_status="in_progress")
     
     # Wait for termination
     try:
         await server.wait_for_termination()
     except KeyboardInterrupt:
         logger.info("Server shutdown requested", reason="keyboard_interrupt")
+        # Cancel background task if still running
+        if not initialization_task.done():
+            initialization_task.cancel()
+            try:
+                await initialization_task
+            except asyncio.CancelledError:
+                logger.info("Background initialization cancelled")
     except Exception as e:
         logger.error("Server terminated unexpectedly", error=str(e), exc_info=True)
     finally:

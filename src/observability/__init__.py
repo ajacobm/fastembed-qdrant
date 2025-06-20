@@ -23,7 +23,8 @@ from .log_context import (
     operation_context,
     log_model_operation,
     log_qdrant_operation,
-    log_file_processing
+    log_file_processing,
+    safe_unpack_context
 )
 
 __all__ = [
@@ -38,5 +39,6 @@ __all__ = [
     'operation_context',
     'log_model_operation',
     'log_qdrant_operation',
-    'log_file_processing'
+    'log_file_processing',
+    'safe_unpack_context'
 ]

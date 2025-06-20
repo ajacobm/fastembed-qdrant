@@ -161,3 +161,20 @@ def get_current_request_id() -> Optional[str]:
     """Get the current request ID from context."""
     from .logger import request_id
     return request_id.get()
+
+
+def safe_unpack_context(context: Dict[str, Any], **explicit_kwargs) -> Dict[str, Any]:
+    """
+    Safely unpack context dict, avoiding conflicts with explicit keyword arguments.
+    
+    This helper prevents 'got multiple values for keyword argument' errors
+    when unpacking context into logger calls that also have explicit parameters.
+    
+    Args:
+        context: Context dictionary from operation_context
+        **explicit_kwargs: Explicitly provided keyword arguments
+        
+    Returns:
+        Filtered context dictionary that won't conflict with explicit_kwargs
+    """
+    return {k: v for k, v in context.items() if k not in explicit_kwargs}

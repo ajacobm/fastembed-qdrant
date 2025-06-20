@@ -24,7 +24,7 @@ fastembed-qdrant/
     ├── model_config.py            # 15+ FastEmbed model configs
     ├── text_chunker.py            # Smart text chunking
     ├── qdrant_store.py            # Qdrant integration
-    ├── enhanced_server.py         # Main gRPC server (simplified)
+    ├── grpc_server.py         # Main gRPC server (simplified)
     ├── http_server.py             # FastAPI HTTP wrapper
     ├── client_example.py          # Test client
     └── proto/
